@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Адвент-Майстерня Dnipro-M</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Montserrat', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            orange: '#ff5c00',
+                            orangeHover: '#e05000',
+                            dark: '#111111',
+                            metalLight: '#3a3e45',
+                            metalDark: '#1e2024',
+                            metalBase: '#2a2d32'
+                        }
+                    },
+                    boxShadow: {
+                        'metal-drawer': 'inset 0 2px 5px rgba(255,255,255,0.1), inset 0 -4px 10px rgba(0,0,0,0.8), 0 5px 15px rgba(0,0,0,0.5)',
+                        'metal-drawer-pressed': 'inset 0 4px 12px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.5)',
+                        'glow-orange': '0 0 15px #ff5c00, inset 0 0 10px rgba(255, 92, 0, 0.5)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #111;
+            /* Industrial pegboard / diamond plate pattern */
+            background-image: 
+                radial-gradient(#222 15%, transparent 16%),
+                radial-gradient(#222 15%, transparent 16%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            color: #ffffff;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Metal textures for drawers */
+        .metal-surface {
+            background: linear-gradient(135deg, var(--tw-colors-brand-metalLight), var(--tw-colors-brand-metalDark));
+            border: 1px solid #4a4d52;
+            border-bottom-color: #000;
+            border-right-color: #000;
+        }
+
+        .brushed-metal {
+            background-image: repeating-linear-gradient(
+                90deg,
+                rgba(255,255,255,0.03) 0px,
+                rgba(255,255,255,0.03) 1px,
+                transparent 1px,
+                transparent 4px
+            );
+        }
+
+        /* Rivets */
+        .rivet {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: radial-gradient(circle at 30% 30%, #888, #222);
+            border-radius: 50%;
+            box-shadow: 0 1px 1px rgba(255,255,255,0.2), inset 0 -1px 2px rgba(0,0,0,0.8);
+        }
+
+        /* Animations */
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 5px #ff5c00, inset 0 0 5px rgba(255, 92, 0, 0.3); border-color: #ff5c00; }
+            50% { box-shadow: 0 0 20px #ff5c00, inset 0 0 15px rgba(255, 92, 0, 0.6); border-color: #ffa473; }
+            100% { box-shadow: 0 0 5px #ff5c00, inset 0 0 5px rgba(255, 92, 0, 0.3); border-color: #ff5c00; }
+        }
+        .current-day-glow {
+            animation: pulse-border 2s infinite;
+            border: 2px solid #ff5c00;
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-15deg); }
+            50% { transform: rotate(15deg); }
+            75% { transform: rotate(-15deg); }
+        }
+        .wiggle {
+            animation: wiggle 0.4s ease-in-out;
+        }
+
+        /* Modal transitions */
+        .modal-enter { opacity: 0; transform: scale(0.9) translateY(20px); }
+        .modal-enter-active { opacity: 1; transform: scale(1) translateY(0); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .modal-exit { opacity: 1; transform: scale(1); }
+        .modal-exit-active { opacity: 0; transform: scale(0.9) translateY(-20px); transition: all 0.2s ease-in; pointer-events: none; }
+        
+        /* Toast transition */
+        .toast-hidden { transform: translateY(-150%); opacity: 0; }
+        .toast-visible { transform: translateY(0); opacity: 1; }
+
+        /* Custom Scrollbar for test panel */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff5c00; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans relative pb-10">
+
+    <!-- Test Panel (Admin) -->
+    <div class="bg-gray-900 border-b border-gray-700 text-xs p-2 flex justify-between items-center z-50 relative">
+        <div class="text-gray-400 font-bold flex items-center gap-2">
+            <i class="fas fa-cogs"></i> Режим тестування:
+        </div>
+        <div class="flex items-center gap-2">
+            <label for="test-date" class="text-gray-400">Сьогодні:</label>
+            <input type="date" id="test-date" class="bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 outline-none focus:border-brand-orange">
+            <button onclick="resetProgress()" class="bg-red-900 hover:bg-red-700 text-white px-2 py-1 rounded transition">Скинути прогрес</button>
+        </div>
+    </div>
+
+    <header class="w-full pt-8 pb-4 px-4 text-center relative">
+        <div class="inline-block bg-brand-orange text-black font-black text-sm px-3 py-1 uppercase tracking-widest transform -skew-x-12 shadow-lg mb-2">
+            <span class="transform skew-x-12 block">Спецпроєкт</span>
+        </div>
+        <h1 class="text-3xl md:text-5xl font-black uppercase tracking-tight text-white mb-2 drop-shadow-md">
+            Адвент-Майстерня <span class="text-brand-orange">Dnipro-M</span>
+        </h1>
+        <p class="text-gray-400 font-semibold max-w-xl mx-auto text-sm md:text-base">
+            Твій щоденний інвентар подарунків, порад та фактів. Відкривай нову шухляду щодня!
+        </p>
+    </header>
+
+    <main class="flex-grow w-full max-w-6xl mx-auto px-4 py-6 relative z-10">
+        <!-- Main Organizer Board -->
+        <div class="bg-brand-metalBase border-4 border-[#1a1c1e] rounded-xl p-4 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.8)] relative overflow-hidden">
+            <!-- Board Rivets -->
+            <div class="rivet top-3 left-3"></div><div class="rivet top-3 right-3"></div>
+            <div class="rivet bottom-3 left-3"></div><div class="rivet bottom-3 right-3"></div>
+
+            <!-- Calendar Grid -->
+            <div id="calendar-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 relative z-10 mt-2">
+                <!-- Cells generated by JS -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-[100] px-6 py-3 border-2 shadow-[0_10px_25px_rgba(0,0,0,0.8)] font-bold transition-all duration-300 toast-hidden rounded uppercase tracking-wide flex items-center gap-3">
+        <i id="toast-icon" class="fas fa-info-circle text-xl"></i>
+        <span id="toast-text">Повідомлення</span>
+    </div>
+
+    <!-- Modal for Reward (Hidden by default) -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4">
+        <div id="modal-content" class="metal-surface brushed-metal relative w-full max-w-md rounded-lg shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-gray-600 transition-all modal-enter">
+            <!-- Modal Rivets -->
+            <div class="rivet top-2 left-2"></div><div class="rivet top-2 right-2"></div>
+            <div class="rivet bottom-2 left-2"></div><div class="rivet bottom-2 right-2"></div>
+
+            <button onclick="closeModal()" class="absolute -top-4 -right-4 bg-gray-800 hover:bg-brand-orange text-white rounded-full w-10 h-10 flex items-center justify-center border-2 border-gray-600 transition-colors shadow-lg z-10">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+
+            <div class="p-6 md:p-8 text-center flex flex-col items-center">
+                <div id="modal-icon-container" class="w-20 h-20 rounded-full bg-brand-dark border-4 border-brand-orange shadow-glow-orange flex items-center justify-center mb-6">
+                    <i id="modal-icon" class="fas fa-gift text-3xl text-brand-orange"></i>
+                </div>
+                
+                <h3 id="modal-label" class="text-xs font-black uppercase text-gray-400 tracking-widest mb-1">...</h3>
+                <h2 id="modal-title" class="text-2xl font-black text-white mb-4 uppercase">...</h2>
+                <p id="modal-text" class="text-gray-300 font-medium leading-relaxed mb-6">...</p>
+                
+                <!-- Promo Code Box (Conditional) -->
+                <div id="modal-promo-box" class="w-full hidden flex-col gap-3">
+                    <div class="bg-black border border-gray-700 py-3 px-4 rounded shadow-inner text-center">
+                        <code id="modal-promo-code" class="text-2xl font-black text-brand-orange tracking-wider">...</code>
+                    </div>
+                    <button onclick="copyPromo()" class="w-full bg-brand-orange hover:bg-brand-orangeHover text-white font-black uppercase py-3 rounded shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2">
+                        <i class="fas fa-copy"></i> Скопіювати код
+                    </button>
+                </div>
+                
+                <!-- Simple OK Button for non-promo -->
+                <button id="modal-ok-btn" onclick="closeModal()" class="w-full mt-2 bg-gray-700 hover:bg-gray-600 text-white font-bold uppercase py-3 rounded shadow-md transition-transform active:scale-95">
+                    Зрозуміло
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION & DATA ---
+        const CONFIG = {
+            totalDays: 14,
+            startDate: '2026-10-01T00:00:00', // Real current date is Oct 6, 2026
+            storageKey: 'dniprom_advent_state'
+        };
+
+        // UI Mapping for reward types
+        const TYPE_UI = {
+            'discount': { label: 'Знижка', icon: 'fa-ticket-alt', emptyText: 'Тут була знижка' },
+            'tip': { label: 'Порада Майстра', icon: 'fa-lightbulb', emptyText: 'Тут була порада' },
+            'delivery': { label: 'Безкоштовна доставка', icon: 'fa-truck-fast', emptyText: 'Тут була доставка' }
+        };
+
+        const REWARDS = [
+            { type: 'tip', title: 'Зберігання інструменту', text: 'Завжди зберігайте акумулятори зарядженими на 40-60%, якщо не плануєте працювати довго. Це подовжить їх життя.' }, // Day 1
+            { type: 'discount', title: 'Знижка -10% на ручний інструмент', text: 'Оновіть свій арсенал викруток та шарнірно-губцевого інструменту.', promoCode: 'HAND10' }, // Day 2
+            { type: 'tip', title: 'Чистка після роботи', text: 'Завжди продувайте вентиляційні отвори болгарки після різки бетону або каменю. Це врятує двигун.' }, // Day 3
+            { type: 'delivery', title: 'Безкоштовна доставка', text: 'Оформлюй замовлення сьогодні і ми доставимо його безкоштовно у відділення.', promoCode: 'FREESHIP26' }, // Day 4
+            { type: 'tip', title: 'Безщіткові двигуни', text: 'Інструменти з безщітковими двигунами (Brushless) служать до 3 разів довше та економлять заряд батареї.' }, // Day 5
+            { type: 'tip', title: 'Як свердлити кахель?', text: 'Щоб свердло не ковзало по плитці, наклейте на місце майбутнього отвору шматочок малярного скотчу.' }, // Day 6
+            { type: 'discount', title: '-15% на витратники', text: 'Час запастися відрізними кругами, свердлами та бурами.', promoCode: 'CONS15' }, // Day 7
+            { type: 'tip', title: 'Крутний момент', text: 'Для складання меблів достатньо шуруповерта з моментом 30-40 Нм, а для будівельних робіт краще брати від 50 Нм.' }, // Day 8
+            { type: 'delivery', title: 'Доставка кур\'єром у подарунок', text: 'Замовляй важкий інструмент, а ми привеземо його прямо до дверей безкоштовно.', promoCode: 'DOOR26' }, // Day 9
+            { type: 'discount', title: 'Секретний промокод -5%', text: 'Діє на всі товари без знижки. Тільки для уважних майстрів!', promoCode: 'SECRET5' }, // Day 10
+            { type: 'tip', title: 'Якість сталі', text: 'Біти Dnipro-M виготовляються зі сталі S2, яка має вищу твердість і стійкість до зношування порівняно зі звичайними.' }, // Day 11
+            { type: 'tip', title: 'Пиляння дерева', text: 'Щоб краї ламінату не сколювались під час різу електролобзиком, використовуйте пилочки з зворотним зубом.' }, // Day 12
+            { type: 'discount', title: '-20% на органайзери', text: 'Наведіть порядок у майстерні з фірмовими кейсами та ящиками.', promoCode: 'ORG20' }, // Day 13
+            { type: 'discount', title: 'Гранд-Знижка -25%', text: 'Останній день адвенту! Лови максимальну знижку на одну одиницю техніки у чеку.', promoCode: 'GRAND25' } // Day 14
+        ];
+
+        // --- 2. STATE MANAGEMENT ---
+        let state = { openedDays: [] };
+        let simulatedCurrentDate = new Date(); // Defaults to real today
+        let activeCellIndex = null;
+
+        function initApp() {
+            loadState();
+            setupTestPanel();
+            renderGrid();
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem(CONFIG.storageKey);
+            if (saved) {
+                try {
+                    state = JSON.parse(saved);
+                } catch(e) {
+                    state = { openedDays: [] };
+                }
+            }
+        }
+
+        function saveState() {
+            localStorage.setItem(CONFIG.storageKey, JSON.stringify(state));
+        }
+
+        function resetProgress() {
+            state.openedDays = [];
+            saveState();
+            renderGrid();
+            showToast('Прогрес скинуто', 'fa-undo', 'bg-gray-800', 'border-gray-600');
+        }
+
+        // --- 3. DATE LOGIC ---
+        function getCellDate(dayIndex) {
+            const date = new Date(CONFIG.startDate);
+            date.setDate(date.getDate() + dayIndex);
+            return date;
+        }
+
+        // Normalizes date to midnight for comparison
+        function stripTime(date) {
+            return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+        }
+
+        function getDayStatus(dayIndex) {
+            const cellDateVal = stripTime(getCellDate(dayIndex));
+            const currentDateVal = stripTime(simulatedCurrentDate);
+
+            if (cellDateVal > currentDateVal) return 'future';
+            if (cellDateVal === currentDateVal) return 'current';
+            return 'past'; // cellDateVal < currentDateVal
+        }
+
+        function formatDate(date) {
+            return date.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        // --- STREAMING_CHUNK:Rendering the Calendar Grid... ---
+        function renderGrid() {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+
+            for (let i = 0; i < CONFIG.totalDays; i++) {
+                const status = getDayStatus(i);
+                const isOpened = state.openedDays.includes(i);
+                const dayNum = i + 1;
+                const reward = REWARDS[i] || REWARDS[0];
+                const uiType = TYPE_UI[reward.type];
+
+                const cell = document.createElement('div');
+                cell.className = 'metal-surface brushed-metal rounded-lg shadow-metal-drawer relative cursor-pointer select-none overflow-hidden transition-all duration-300';
+                cell.style.aspectRatio = '1 / 1';
+                cell.id = `cell-${i}`;
+                
+                // Base handle styling (drawer aesthetic)
+                const drawerHandle = `<div class="absolute top-2 left-1/2 transform -translate-x-1/2 w-1/3 h-2 bg-black opacity-30 rounded-full"></div>`;
+
+                let innerHTML = '';
+
+                if (status === 'future') {
+                    // FUTURE CELL
+                    cell.onclick = () => handleFutureClick(i);
+                    cell.classList.add('hover:brightness-110');
+                    innerHTML = `
+                        ${drawerHandle}
+                        <div class="absolute inset-0 flex flex-col items-center justify-center opacity-70">
+                            <i id="lock-${i}" class="fas fa-lock text-3xl md:text-4xl text-gray-500 mb-2 drop-shadow-md"></i>
+                            <span class="text-4xl font-black text-gray-600 opacity-50">${dayNum}</span>
+                        </div>
+                    `;
+                } 
+                else if (status === 'current') {
+                    // CURRENT CELL
+                    cell.onclick = () => handleCurrentClick(i);
+                    cell.classList.add('current-day-glow', 'hover:scale-[1.02]', 'z-20');
+                    // Ensure current day visually pops out
+                    cell.classList.replace('shadow-metal-drawer', 'shadow-[0_10px_20px_rgba(255,92,0,0.3)]');
+                    
+                    innerHTML = `
+                        ${drawerHandle}
+                        <div class="absolute inset-0 flex flex-col items-center justify-center bg-brand-orange bg-opacity-10">
+                            <span class="text-4xl md:text-5xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">${dayNum}</span>
+                            <span class="mt-2 text-[10px] md:text-xs font-bold uppercase tracking-wider text-brand-orange bg-black bg-opacity-60 px-2 py-1 rounded">Відкрити</span>
+                        </div>
+                    `;
+                } 
+                else if (status === 'past') {
+                    // PAST CELL
+                    if (isOpened) {
+                        // OPENED (Success)
+                        cell.onclick = () => handleCurrentClick(i); // Allow viewing again
+                        cell.classList.add('border-gray-500', 'hover:brightness-110');
+                        innerHTML = `
+                            ${drawerHandle}
+                            <div class="absolute inset-0 flex flex-col items-center justify-center p-2 pt-4 bg-gray-800 bg-opacity-40">
+                                <span class="absolute top-1 right-1 bg-green-600 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm font-bold uppercase">Відкрито</span>
+                                <div class="text-brand-orange mb-1 drop-shadow-md">
+                                    <i class="fas ${uiType.icon} text-2xl md:text-3xl"></i>
+                                </div>
+                                <span class="text-[10px] md:text-xs font-bold text-center leading-tight text-gray-200">${uiType.label}</span>
+                            </div>
+                        `;
+                    } else {
+                        // MISSED (FOMO)
+                        cell.classList.add('opacity-60', 'grayscale-[50%]');
+                        cell.onclick = () => showToast('Цей день вже минув, слідкуй за новими!', 'fa-clock', 'bg-gray-700', 'border-gray-500');
+                        innerHTML = `
+                            ${drawerHandle}
+                            <div class="absolute inset-0 flex flex-col items-center justify-center p-2 pt-4 bg-black bg-opacity-60">
+                                <span class="absolute top-1 right-1 bg-red-700 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm font-bold uppercase">Пропущено</span>
+                                <div class="text-gray-500 mb-1">
+                                    <i class="fas ${uiType.icon} text-xl md:text-2xl opacity-50"></i>
+                                </div>
+                                <span class="text-[9px] md:text-[10px] font-bold text-center leading-tight text-gray-400 max-w-full">${uiType.emptyText}</span>
+                            </div>
+                        `;
+                    }
+                }
+
+                cell.innerHTML = innerHTML;
+                grid.appendChild(cell);
+            }
+        }
+
+        // --- STREAMING_CHUNK:Event Handlers and Interactivity... ---
+        function handleFutureClick(dayIndex) {
+            const icon = document.getElementById(`lock-${dayIndex}`);
+            if (icon) {
+                icon.classList.remove('wiggle');
+                void icon.offsetWidth; // trigger reflow
+                icon.classList.add('wiggle');
+            }
+            const dateStr = formatDate(getCellDate(dayIndex));
+            showToast(`Відкриється ${dateStr}`, 'fa-lock', 'bg-brand-metalBase', 'border-brand-orange');
+        }
+
+        function handleCurrentClick(dayIndex) {
+            activeCellIndex = dayIndex;
+            const reward = REWARDS[dayIndex];
+            const uiType = TYPE_UI[reward.type];
+
+            // Populate Modal
+            document.getElementById('modal-icon').className = `fas ${uiType.icon} text-3xl md:text-4xl text-brand-orange`;
+            document.getElementById('modal-label').innerText = uiType.label;
+            document.getElementById('modal-title').innerText = reward.title;
+            document.getElementById('modal-text').innerText = reward.text;
+
+            const promoBox = document.getElementById('modal-promo-box');
+            const okBtn = document.getElementById('modal-ok-btn');
+
+            if (reward.promoCode) {
+                document.getElementById('modal-promo-code').innerText = reward.promoCode;
+                promoBox.classList.remove('hidden');
+                promoBox.classList.add('flex');
+                okBtn.classList.add('hidden');
+            } else {
+                promoBox.classList.add('hidden');
+                promoBox.classList.remove('flex');
+                okBtn.classList.remove('hidden');
+            }
+
+            // Show Modal
+            const overlay = document.getElementById('modal-overlay');
+            const content = document.getElementById('modal-content');
+            overlay.classList.remove('hidden');
+            
+            // Animation handling
+            content.classList.remove('modal-exit', 'modal-exit-active');
+            requestAnimationFrame(() => {
+                content.classList.add('modal-enter-active');
+            });
+        }
+
+        function closeModal() {
+            const overlay = document.getElementById('modal-overlay');
+            const content = document.getElementById('modal-content');
+            
+            content.classList.add('modal-exit-active');
+            content.classList.remove('modal-enter-active');
+
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                
+                // Update state after closing if it was a new open
+                if (activeCellIndex !== null && !state.openedDays.includes(activeCellIndex)) {
+                    state.openedDays.push(activeCellIndex);
+                    saveState();
+                    renderGrid();
+                }
+                activeCellIndex = null;
+            }, 200);
+        }
+
+        function copyPromo() {
+            const code = document.getElementById('modal-promo-code').innerText;
+            
+            try {
+                // Primary method
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(code).then(() => {
+                        showCopySuccess();
+                    });
+                } else {
+                    // Fallback
+                    let textArea = document.createElement("textarea");
+                    textArea.value = code;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-999999px";
+                    textArea.style.top = "-999999px";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    textArea.remove();
+                    showCopySuccess();
+                }
+            } catch (err) {
+                console.error('Failed to copy', err);
+            }
+        }
+
+        function showCopySuccess() {
+            closeModal();
+            setTimeout(() => {
+                showToast('Промокод скопійовано!', 'fa-check-circle', 'bg-green-700', 'border-green-500');
+            }, 250);
+        }
+
+        // --- STREAMING_CHUNK:Utility functions (Toast, Admin Panel)... ---
+        let toastTimeout;
+        function showToast(message, iconClass, bgColorClass = 'bg-gray-800', borderColorClass = 'border-brand-orange') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            
+            document.getElementById('toast-text').innerText = message;
+            
+            // Reset classes
+            toast.className = `fixed top-20 left-1/2 transform -translate-x-1/2 z-[100] px-4 md:px-6 py-3 border-2 shadow-[0_10px_25px_rgba(0,0,0,0.8)] font-bold transition-all duration-300 rounded uppercase tracking-wide flex items-center gap-2 text-xs md:text-sm text-white toast-hidden ${bgColorClass} ${borderColorClass}`;
+            icon.className = `fas ${iconClass} text-lg md:text-xl`;
+
+            // Trigger reflow to restart transition
+            void toast.offsetWidth;
+            
+            toast.classList.remove('toast-hidden');
+            toast.classList.add('toast-visible');
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('toast-visible');
+                toast.classList.add('toast-hidden');
+            }, 3000);
+        }
+
+        function setupTestPanel() {
+            const dateInput = document.getElementById('test-date');
+            // Format current simulated date for input
+            const d = simulatedCurrentDate;
+            const formatted = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            dateInput.value = formatted;
+
+            dateInput.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    simulatedCurrentDate = new Date(e.target.value);
+                    simulatedCurrentDate.setHours(0,0,0,0);
+                    renderGrid();
+                }
+            });
+        }
+
+        // Boot up
+        window.addEventListener('DOMContentLoaded', initApp);
+
+    </script>
+</body>
+</html>
